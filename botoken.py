@@ -472,7 +472,7 @@ async def generar_tokens_masa(event):
         key = f"{usuario}:{clave}"
         actividad[key] = {"usuario": usuario, "clave": clave, "token": token, "estado": estado}
         guardar_actividad()
-        resultados.append(f"` {usuario}:{clave} ` - Token {estado}")
+        resultados.append(f"`{usuario}:{clave}` - Token {estado}")
     respuesta = "📋 Verificados Correctamente:\n" + "\n".join(resultados)
     await event.reply(respuesta + "\n\n🏢 𝗦𝗼𝗹𝘂𝗰𝗶𝗼𝗻𝗲𝘀 𝗰𝗼𝗻 Asteriscom", parse_mode='markdown')
 
@@ -487,13 +487,48 @@ async def ver_historial(event):
         await event.reply("❌ Este comando no existe, quizás /comandos \n\n🏢 𝗦𝗼𝗹𝘂𝗰𝗶𝗼𝗻𝗲𝘀 𝗰𝗼𝗻 @{CEO_USER}")
         return
     if actividad:
-        historial = "\n".join([
-            f"{i + 1}. ` {record['usuario']}:{record['clave']} ` - Token {record['estado']} {'' if record['estado'] == 'Exitoso✅' else ''}"
+        historial_text = "\n".join([
+            f"{i + 1}. {record['usuario']}:{record['clave']} - Token {record['estado']}"
             for i, record in enumerate(actividad.values())
         ])
-        await event.reply(f"📋 Historial de credenciales:\n{historial}\n\n🏢 𝗦𝗼𝗹𝘂𝗰𝗶𝗼𝗻𝗲𝘀 𝗰𝗼𝗻 @{CEO_USER}", parse_mode='markdown')
+        filename = f"historial_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        with open(filename, "w", encoding="utf-8") as f:
+            f.write(historial_text)
+        await event.reply(file=filename, caption="📋 Historial de credenciales")
+        os.remove(filename)
     else:
         await event.reply("❌ No hay actividad registrada.\n\n🏢 𝗦𝗼𝗹𝘂𝗰𝗶𝗼𝗻𝗲𝘀 𝗰𝗼𝗻 @Asteriscom")
+
+# Nuevo comando: Historial de tokens verificados (solo los que funcionan) y actualizar el historial
+@client.on(events.NewMessage(pattern=r'/historialtoken'))
+@solo_chats_privados
+@anti_spam
+async def historial_token(event):
+    sender = await event.get_sender()
+    username = sender.username
+    if username not in admins:
+        await event.reply("❌ No tienes permisos para usar este comando.\n\n🏢 𝗦𝗼𝗹𝘂𝗰𝗶𝗼𝗻𝗲𝘀 𝗰𝗼𝗻 @{CEO_USER}")
+        return
+    valid_entries = []
+    for key, record in actividad.items():
+        usuario = record["usuario"]
+        clave = record["clave"]
+        token = await obtener_token(usuario, clave)
+        estado = "Exitoso✅" if token else "Fallido❌"
+        record["token"] = token
+        record["estado"] = estado
+        if estado == "Exitoso✅":
+            valid_entries.append(f"{usuario}:{clave} - Token {estado}")
+    guardar_actividad()
+    if not valid_entries:
+        await event.reply("❌ Ninguna credencial funciona actualmente.\n\n🏢 𝗦𝗼𝗹𝘂𝗰𝗶𝗼𝗻𝗲𝘀 𝗰𝗼𝗻 @{CEO_USER}")
+        return
+    historial_token_text = "\n".join(valid_entries)
+    filename = f"historialtoken_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+    with open(filename, "w", encoding="utf-8") as f:
+        f.write(historial_token_text)
+    await event.reply(file=filename, caption="📋 Historial de tokens verificados")
+    os.remove(filename)
 
 # Limpiar historial (solo para administradores/CEO)
 @client.on(events.NewMessage(pattern=r'/limpiar'))
@@ -507,7 +542,7 @@ async def limpiar_historial(event):
         return
     actividad.clear()
     guardar_actividad()
-    await event.reply("🗑️ El historial de actividad ha sido limpiado.\n\n🏢 𝗦𝗼𝗹𝘂𝗰𝗶𝗼𝗻𝗲𝘀 𝗰𝗼𝗻 @Asteriscom")
+    await event.reply("🗑️ El historial de actividad ha sido limpiado.\n\n🏢 𝗦𝗼𝗹𝘂𝗰𝗶𝗼𝗻𝗲𝘀 𝗰𝗼𝗻 @{CEO_USER}")
 
 # ---------------- COMANDOS EXTRAS PARA ADMIN/CEO ----------------
 
@@ -519,7 +554,7 @@ async def listar_todos_comandos(event):
     sender = await event.get_sender()
     username = sender.username
     if username not in admins:
-        await event.reply("❌ Formato incorrecto. Usa /comandos \n\n🏢 𝗦𝗼𝗹𝘂𝗰𝗶𝗼𝗻𝗲𝘀 𝗰𝗼𝗻 @Asteriscom")
+        await event.reply("❌ Formato incorrecto. Usa /comandos \n\n🏢 𝗦𝗼𝗹𝘂𝗰𝗶𝗼𝗻𝗲𝘀 𝗰𝗼𝗻 @{CEO_USER}")
         return
     mensaje = "📋 Comandos Globales (Admin):\n"
     if URLS:
