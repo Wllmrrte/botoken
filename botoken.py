@@ -167,9 +167,9 @@ def formatear_respuesta_token(usuario, clave, token, estado):
     expiracion = "30s" if estado == "Exitoso✅" else "00s"
     return (
         f"👁️ 𝗜𝗻𝗳𝗼𝗿𝗺𝗮𝗰𝗶𝗼́𝗻 𝗱𝗲𝗹 𝗧𝗼𝗸𝗲𝗻:\n\n"
-        f"👤 𝗨𝘀𝘂𝗮𝗿𝗶𝗼:  ` {usuario} `\n"
-        f"🔑 𝗖𝗼𝗻𝘁𝗿𝗮𝘀𝗲𝗻̃𝗮: ` {clave} `\n"
-        f"🎟️ 𝗧𝗼𝗸𝗲𝗻 𝗴𝗲𝗻𝗲𝗿𝗮𝗱𝗼: ` {token if estado == 'Exitoso✅' else 'No disponible'} `\n"
+        f"👤 𝗨𝘀𝘂𝗮𝗿𝗶𝗼:  `{usuario}`\n"
+        f"🔑 𝗖𝗼𝗻𝘁𝗿𝗮𝘀𝗲𝗻̃𝗮: `{clave}`\n"
+        f"🎟️ 𝗧𝗼𝗸𝗲𝗻 𝗴𝗲𝗻𝗲𝗿𝗮𝗱𝗼: `{token if estado == 'Exitoso✅' else 'No disponible'}`\n"
         f"🌐 𝗘𝘀𝘁𝗮𝗱𝗼:  {estado}\n\n"
         f"⌛️ 𝗘𝗫𝗣𝗜𝗥𝗔𝗖𝗜𝗢́𝗡: {expiracion}\n\n"
         f"𝗥𝗲𝘀𝗽𝘂𝗲𝘀𝘁𝗮 𝗰𝗼𝗻 𝗮𝗻𝘁𝗶𝘀𝗽𝗮𝗺 𝗱𝗲 𝟱𝘀\n"
@@ -413,7 +413,7 @@ async def listar_comandos_usuario(event):
     else:
         # Para usuarios regulares, solo se muestran sus propios comandos
         if username not in permisos or permisos[username] < datetime.now():
-            await event.reply("❌ No tienes permisos para ver comandos personalizados.\n\n🏢 𝗦𝗼𝗹𝘂𝗰𝗶𝗼𝗻𝗲𝘀 𝗰𝗼𝗻 @{CEO_USER}")
+            await event.reply("❌ Incorrecto quizás /comandos\n\n🏢 𝗦𝗼𝗹𝘂𝗰𝗶𝗼𝗻𝗲𝘀 𝗰𝗼𝗻 @{CEO_USER}")
             return
         if username in comandos_usuario and comandos_usuario[username]:
             lista = "\n".join([f"/{cmd}: {data['usuario']}:{data['clave']}" for cmd, data in comandos_usuario[username].items()])
@@ -431,7 +431,7 @@ async def generar_token(event):
     sender = await event.get_sender()
     username = sender.username
     if username not in permisos or permisos[username] < datetime.now():
-        await event.reply("❌ No tienes una membresía activa.\n\n🏢 𝗦𝗼𝗹𝘂𝗰𝗶𝗼𝗻𝗲𝘀 𝗰𝗼𝗻 @{CEO_USER}")
+        await event.reply("")
         return
     credenciales = event.pattern_match.group(1)
     if ":" not in credenciales:
@@ -472,7 +472,7 @@ async def generar_tokens_masa(event):
         key = f"{usuario}:{clave}"
         actividad[key] = {"usuario": usuario, "clave": clave, "token": token, "estado": estado}
         guardar_actividad()
-        resultados.append(f"` {usuario}:{clave} ` - Token {estado}")
+        resultados.append(f"`{usuario}:{clave}` - Token {estado}")
     respuesta = "📋 Verificados Correctamente:\n" + "\n".join(resultados)
     await event.reply(respuesta + "\n\n🏢 𝗦𝗼𝗹𝘂𝗰𝗶𝗼𝗻𝗲𝘀 𝗰𝗼𝗻 Asteriscom", parse_mode='markdown')
 
