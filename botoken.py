@@ -167,9 +167,9 @@ def formatear_respuesta_token(usuario, clave, token, estado):
     expiracion = "30s" if estado == "Exitoso✅" else "00s"
     return (
         f"👁️ 𝗜𝗻𝗳𝗼𝗿𝗺𝗮𝗰𝗶𝗼́𝗻 𝗱𝗲𝗹 𝗧𝗼𝗸𝗲𝗻:\n\n"
-        f"👤 𝗨𝘀𝘂𝗮𝗿𝗶𝗼:  ` {usuario} `\n"
-        f"🔑 𝗖𝗼𝗻𝘁𝗿𝗮𝘀𝗲𝗻̃𝗮: ` {clave} `\n"
-        f"🎟️ 𝗧𝗼𝗸𝗲𝗻 𝗴𝗲𝗻𝗲𝗿𝗮𝗱𝗼: ` {token if estado == 'Exitoso✅' else 'No disponible'} `\n"
+        f"👤 𝗨𝘀𝘂𝗮𝗿𝗶𝗼:  `{usuario}`\n"
+        f"🔑 𝗖𝗼𝗻𝘁𝗿𝗮𝘀𝗲𝗻̃𝗮: `{clave}`\n"
+        f"🎟️ 𝗧𝗼𝗸𝗲𝗻 𝗴𝗲𝗻𝗲𝗿𝗮𝗱𝗼: `{token if estado == 'Exitoso✅' else 'No disponible'}`\n"
         f"🌐 𝗘𝘀𝘁𝗮𝗱𝗼:  {estado}\n\n"
         f"⌛️ 𝗘𝗫𝗣𝗜𝗥𝗔𝗖𝗜𝗢́𝗡: {expiracion}\n\n"
         f"𝗥𝗲𝘀𝗽𝘂𝗲𝘀𝘁𝗮 𝗰𝗼𝗻 𝗮𝗻𝘁𝗶𝘀𝗽𝗮𝗺 𝗱𝗲 𝟱𝘀\n"
@@ -395,7 +395,7 @@ async def listar_comandos_usuario(event):
         # Si el usuario es admin/CEO, se listan los comandos globales y los de todos los usuarios
         mensaje = "📋 Comandos Globales (Admin):\n"
         if URLS:
-            mensaje += "\n".join([f"/{cmd}: {data['usuario']}:{data['clave']}" for cmd, data in URLS.items()])
+            mensaje += "\n".join([f"/{cmd}: `{data['usuario']}:{data['clave']}`" for cmd, data in URLS.items()])
         else:
             mensaje += "No hay comandos globales registrados.\n"
         mensaje += "\n\n📋 Comandos personalizados de usuarios:\n"
