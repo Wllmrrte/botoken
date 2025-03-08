@@ -43,6 +43,27 @@ temp_ban = {}          # Baneos temporales: usuario -> fecha de expiración
 permanent_ban = set()   # Baneos permanentes: conjunto de usuarios
 # -----------------------------------------------------------------
 
+# Diccionarios para seguimiento de usos diarios en /token y /tokenmasa
+token_usage = {}      # Límite 150 usos diarios
+tokenmasa_usage = {}  # Límite 10 usos diarios
+
+def check_and_update_usage(username, usage_dict, limit):
+    """Verifica y actualiza el contador de usos diarios para un usuario.
+    Si el día ha cambiado, reinicia el contador.
+    Retorna True si el uso es permitido, o False si se ha excedido el límite.
+    """
+    today = datetime.now().strftime("%Y-%m-%d")
+    if username in usage_dict:
+        # Reinicia el contador si el día ha cambiado
+        if usage_dict[username]["date"] != today:
+            usage_dict[username] = {"date": today, "count": 0}
+        if usage_dict[username]["count"] >= limit:
+            return False
+        usage_dict[username]["count"] += 1
+    else:
+        usage_dict[username] = {"date": today, "count": 1}
+    return True
+
 # Crear archivos JSON si no existen
 def crear_archivos_json():
     if not os.path.exists(ARCHIVO_PERMISOS):
@@ -186,7 +207,7 @@ def crear_botones_urls():
 
 # ---------------- COMANDOS ADMINISTRATIVOS / CEO ----------------
 
-# Otorgar membresía temporal
+# Otorgar membresía temporal (/vip)
 @client.on(events.NewMessage(pattern=r'/vip(\d+)\s+(.+)'))
 @solo_chats_privados
 @anti_spam
@@ -201,6 +222,21 @@ async def otorgar_membresia(event):
     permisos[nuevo_usuario] = datetime.now() + timedelta(days=dias)
     guardar_permisos()
     await event.reply(f"🎉 @{nuevo_usuario} ha recibido {dias} días de membresía VIP.\n\n🏢 𝗦𝗼𝗹𝘂𝗰𝗶𝗼𝗻𝗲𝘀 𝗰𝗼𝗻 @{CEO_USER}")
+
+# Comando de respaldo para otorgar membresía (/viptoken30) siempre 30 días
+@client.on(events.NewMessage(pattern=r'/viptoken30\s+(.+)'))
+@solo_chats_privados
+@anti_spam
+async def otorgar_membresia_viptoken30(event):
+    sender = await event.get_sender()
+    username = sender.username
+    if username not in admins:
+        await event.reply("❌ No tienes permiso para otorgar privilegios.")
+        return
+    nuevo_usuario = event.pattern_match.group(1).lstrip('@')
+    permisos[nuevo_usuario] = datetime.now() + timedelta(days=30)
+    guardar_permisos()
+    await event.reply(f"🎉 @{nuevo_usuario} ha recibido 30 días de membresía VIP.\n\n🏢 𝗦𝗼𝗹𝘂𝗰𝗶𝗼𝗻𝗲𝘀 𝗰𝗼𝗻 @{CEO_USER}")
 
 # Quitar membresía temporal
 @client.on(events.NewMessage(pattern=r'/uvip(\d+)\s+(.+)'))
@@ -297,6 +333,23 @@ async def verificar_membresia(event):
         await event.reply(f"@{usuario_a_verificar} cuenta con {dias} días, {horas} horas y {minutos} minutos de membresía.\n\n🏢 𝗦𝗼𝗹𝘂𝗰𝗶𝗼𝗻𝗲𝘀 𝗰𝗼𝗻 @{CEO_USER}")
     else:
         await event.reply(f"❌ No se encontraron permisos para @{usuario_a_verificar}.\n\n🏢 𝗦𝗼𝗹𝘂𝗰𝗶𝗼𝗻𝗲𝘀 𝗰𝗼𝗻 @{CEO_USER}")
+
+# Nuevo comando: Reiniciar contador de usos diarios para un usuario (exclusivo del CEO)
+@client.on(events.NewMessage(pattern=r'/restartoken\s+(.+)'))
+@solo_chats_privados
+@anti_spam
+async def restartoken(event):
+    sender = await event.get_sender()
+    username = sender.username
+    if username != CEO_USER:
+        await event.reply("❌ Solo el CEO puede usar este comando.\n\n🏢 𝗦𝗼𝗹𝘂𝗰𝗶𝗼𝗻𝗲𝘀 𝗰𝗼𝗻 @{CEO_USER}")
+        return
+    target_user = event.pattern_match.group(1).lstrip('@')
+    today = datetime.now().strftime("%Y-%m-%d")
+    # Reiniciar contadores para /token y /tokenmasa
+    token_usage[target_user] = {"date": today, "count": 0}
+    tokenmasa_usage[target_user] = {"date": today, "count": 0}
+    await event.reply(f"✅ Los contadores diarios de /token y /tokenmasa para @{target_user} han sido reiniciados.\n\n🏢 𝗦𝗼𝗹𝘂𝗰𝗶𝗼𝗻𝗲𝘀 𝗰𝗼𝗻 @{CEO_USER}")
 
 # ---------------- COMANDOS PERSONALIZADOS (ADMIN Y USUARIOS CON MEMBRESÍA) ----------------
 
@@ -423,7 +476,7 @@ async def listar_comandos_usuario(event):
 
 # ---------------- COMANDOS PARA USUARIOS CON MEMBRESÍA ----------------
 
-# Generar token individual
+# Generar token individual (/token) – límite 150 usos diarios
 @client.on(events.NewMessage(pattern=r'/token\s+([^ ]+)'))
 @solo_chats_privados
 @anti_spam
@@ -432,6 +485,10 @@ async def generar_token(event):
     username = sender.username
     if username not in permisos or permisos[username] < datetime.now():
         await event.reply("")
+        return
+    # Verificar límite diario de 150 usos
+    if not check_and_update_usage(username, token_usage, 150):
+        await event.reply("❌ Has excedido el límite diario de 150 usos para /token. Inténtalo mañana.")
         return
     credenciales = event.pattern_match.group(1)
     if ":" not in credenciales:
@@ -456,7 +513,7 @@ async def generar_token(event):
         parse_mode='markdown'
     )
 
-# Generar tokens en masa
+# Generar tokens en masa (/tokenmasa) – límite 10 usos diarios
 @client.on(events.NewMessage(pattern=r'/tokenmasa\s+(.+)'))
 @solo_chats_privados
 @anti_spam
@@ -465,6 +522,10 @@ async def generar_tokens_masa(event):
     username = sender.username
     if username not in permisos or permisos[username] < datetime.now():
         await event.reply("❌ No tienes una membresía activa.\n\n🏢 𝗦𝗼𝗹𝘂𝗰𝗶𝗼𝗻𝗲𝘀 𝗰𝗼𝗻 @Asteriscom")
+        return
+    # Verificar límite diario de 10 usos
+    if not check_and_update_usage(username, tokenmasa_usage, 10):
+        await event.reply("❌ Has excedido el límite diario de 10 usos para /tokenmasa. Inténtalo mañana.")
         return
     credenciales_lista = event.pattern_match.group(1).split("|")
     resultados = []
@@ -490,6 +551,29 @@ async def generar_tokens_masa(event):
             resultados.append(f"`{usuario}:{clave}` - Token Fallido❌")
     respuesta = "📋 Verificados Correctamente:\n" + "\n".join(resultados)
     await event.reply(respuesta + "\n\n🏢 𝗦𝗼𝗹𝘂𝗰𝗶𝗼𝗻𝗲𝘀 𝗰𝗼𝗻 Asteriscom", parse_mode='markdown')
+
+# Comando para mostrar los usos diarios restantes (/usos)
+@client.on(events.NewMessage(pattern=r'/usos'))
+@solo_chats_privados
+@anti_spam
+async def mostrar_usos(event):
+    sender = await event.get_sender()
+    username = sender.username
+    today = datetime.now().strftime("%Y-%m-%d")
+    # Para /token
+    token_info = token_usage.get(username, {"date": today, "count": 0})
+    used_token = token_info["count"] if token_info["date"] == today else 0
+    remaining_token = 150 - used_token
+    # Para /tokenmasa
+    tokenmasa_info = tokenmasa_usage.get(username, {"date": today, "count": 0})
+    used_tokenmasa = tokenmasa_info["count"] if tokenmasa_info["date"] == today else 0
+    remaining_tokenmasa = 10 - used_tokenmasa
+    await event.reply(
+         f"🔑 **USOS DIAROS TOKENBOT**\n\n"
+         f"/token: {used_token} usados, {remaining_token} restantes.\n"
+         f"/tokenmasa: {used_tokenmasa} usados, {remaining_tokenmasa} restantes.\n\n"
+         f"**Así se usa** https://youtu.be/CW7gfrTlr0Y"
+    )
 
 # Consultar historial de credenciales (solo para administradores/CEO)
 @client.on(events.NewMessage(pattern=r'/historial'))
